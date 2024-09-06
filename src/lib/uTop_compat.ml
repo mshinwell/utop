@@ -28,7 +28,7 @@ let get_load_path () =
 #endif
 
 let set_load_path visible =
-#if OCAML_VERSION >= (5, 2, 0)
+#if OCAML_VERSION >= (5, 1, 0)
   Load_path.init ~auto_include:Load_path.no_auto_include ~visible ~hidden:[]
 #elif OCAML_VERSION >= (5, 0, 0)
   Load_path.init ~auto_include:Load_path.no_auto_include visible
@@ -59,7 +59,7 @@ let toploop_load_file ppf fn =
 
 (** Returns whether the given path is persistent. *)
 let rec is_persistent_path = function
-  | Path.Pident id -> Ident.persistent id
+  | Path.Pident id -> Ident.is_global id
   | Path.Pdot (p, _) -> is_persistent_path p
   | Path.Papply (_, p) -> is_persistent_path p
 #if OCAML_VERSION >= (5, 1, 0)
@@ -94,7 +94,7 @@ let invalid_package_error_to_string err =
 
 module Exp = struct
   open Ast_helper
-#if OCAML_VERSION >= (5, 2, 0)
+#if OCAML_VERSION >= (5, 1, 0)
   open Parsetree
   let fun_ ~loc p e =
    let args = [{
@@ -108,8 +108,8 @@ module Exp = struct
 end
 
 let abstract_type_kind =
-#if OCAML_VERSION >= (5, 2, 0)
-  Types.(Type_abstract Definition)
+#if OCAML_VERSION >= (5, 1, 0)
+  Types.(Type_abstract Abstract_def)
 #else
   Types.Type_abstract
 #endif
@@ -130,7 +130,7 @@ let visible_paths_for_cmt_infos (cmt_infos: Cmt_format.cmt_infos) =
 
 let add_cmi_hook f =
   let default_load = !Persistent_env.Persistent_signature.load in
-#if OCAML_VERSION >= (5, 2, 0)
+#if OCAML_VERSION >= (5, 1, 0)
   let load ~allow_hidden ~unit_name =
     let res = default_load ~unit_name ~allow_hidden in
 #else

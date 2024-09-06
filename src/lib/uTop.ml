@@ -18,7 +18,7 @@ let (>>=) = Lwt.(>>=)
 
 module String_set = Set.Make(String)
 
-let version = "%%VERSION%%"
+let version = "2.14.0"
 
 (* +-----------------------------------------------------------------+
    | History                                                         |
@@ -290,6 +290,9 @@ let parse_default parse str eos_is_error =
                  Printf.sprintf "Error: broken invariant in parsetree: %s" s)
       | Syntaxerr.Invalid_package_type (loc, err) ->
           Error ([mkloc loc], UTop_compat.invalid_package_error_to_string err)
+      | Syntaxerr.Missing_unboxed_literal_suffix loc ->
+          Error ([mkloc loc],
+                 Printf.sprintf "Syntax error: missing unboxed literal suffix")
 #if OCAML_VERSION >= (5, 0, 0)
       | Syntaxerr.Removed_string_set loc ->
           Error ([mkloc loc],

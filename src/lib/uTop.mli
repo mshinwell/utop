@@ -340,7 +340,7 @@ val split_words : string -> string list
 
  (** {6 compiler-libs reexports} *)
 
-val get_load_path : unit -> string list
+val get_load_path : unit -> Load_path.paths
 val set_load_path : string list -> unit
   (** [get_load_path] and [set_load_path] manage the include directories.
 

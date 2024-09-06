@@ -319,7 +319,7 @@ end = struct
     | _ -> false
 
   let rec walk_sig pp ~path signature =
-    List.iter (walk_sig_item pp (Some path)) signature
+    List.iter (fun item -> walk_sig_item pp (Some path) item) signature
 
   and walk_sig_item pp path = function
     | Sig_module (id, _, {md_type = mty; _}, _, _) ->
@@ -337,8 +337,9 @@ end = struct
     let new_cmis = ref [] in
     UTop_compat.add_cmi_hook (fun cmi -> new_cmis := cmi :: !new_cmis );
     fun pp ->
-      List.iter (fun (cmi : Cmi_format.cmi_infos) ->
-        walk_sig pp ~path:(Longident.Lident cmi.cmi_name) cmi.cmi_sign
+      List.iter (fun (cmi : Cmi_format.cmi_infos_lazy) ->
+        walk_sig pp ~path:(Longident.Lident (cmi.cmi_name |> Compilation_unit.Name.to_string))
+          (Subst.Lazy.force_signature cmi.cmi_sign)
       ) !new_cmis;
       new_cmis := []
 
@@ -358,7 +359,7 @@ end = struct
         | x when x == last -> ()
         | x :: xs ->
           scan_globals last xs;
-          scan_module env x
+          scan_module env (Ident.create_persistent (Compilation_unit.full_path_as_string x))
       in
       let rec scan_summary last = function
         | Env.Env_empty -> ()
@@ -370,7 +371,7 @@ end = struct
         | Env.Env_value_unbound (s, _, _)
         | Env.Env_module_unbound (s, _, _)
         | Env.Env_persistent (s, _)
-        | Env.Env_value (s, _, _)
+        | Env.Env_value (s, _, _, _)
         | Env.Env_type (s, _, _)
         | Env.Env_extension (s, _, _)
         | Env.Env_modtype (s, _, _)
@@ -627,7 +628,7 @@ let rewrite_str_item pstr_item tstr_item =
   match pstr_item, tstr_item.Typedtree.str_desc with
     | ({ Parsetree.pstr_desc = Parsetree.Pstr_eval (e, _);
          Parsetree.pstr_loc = loc },
-       Typedtree.Tstr_eval ({ Typedtree.exp_type = typ }, _)) -> begin
+       Typedtree.Tstr_eval ({ Typedtree.exp_type = typ }, _, _)) -> begin
       match rule_of_type typ with
         | Some rule ->
           { Parsetree.pstr_desc = Parsetree.Pstr_eval (rule.rewrite loc e, []);
@@ -1510,8 +1511,9 @@ type value = V : string * _ -> value
 exception Found of Env.t
 
 let get_required_label name args =
-  match List.find (fun (lab, _) -> lab = Asttypes.Labelled name) args with
-  | _, x -> x
+  match List.find (fun (lab, _) -> lab = Types.Labelled name) args with
+  | _, Typedtree.Arg (x, _) -> Some x
+  | _, Omitted _ -> None
   | exception Not_found -> None
 
 let walk dir ~init ~f =
@@ -1546,7 +1548,7 @@ let interact ?(search_path=[]) ?(build_dir="_build") ~unit ~loc:(fname, lnum, cn
   let cmt_infos = Cmt_format.read_cmt cmt_fname in
   let expr next (e : Typedtree.expression) =
     match e.exp_desc with
-        | Texp_apply (_, args) -> begin
+        | Texp_apply (_, args, _, _, _) -> begin
             try
               match get_required_label "loc"    args,
                     get_required_label "values" args
@@ -1572,7 +1574,7 @@ let interact ?(search_path=[]) ?(build_dir="_build") ~unit ~loc:(fname, lnum, cn
   with Found env ->
   try
     let visible_paths = UTop_compat.visible_paths_for_cmt_infos cmt_infos in
-    List.iter Topdirs.dir_directory (search_path @ visible_paths);
+    List.iter Topdirs.dir_directory (search_path @ visible_paths.visible @ visible_paths.hidden);
     let env = Envaux.env_of_only_summary env in
     List.iter (fun (V (name, v)) -> Toploop.setvalue name (Obj.repr v)) values;
     main_internal ~initial_env:(Some env)
